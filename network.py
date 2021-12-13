@@ -1,11 +1,11 @@
+from dataloader import Dataset
 import numpy as np
 
 
 class NN:
-    import numpy as np
-    def __init__(self, dataset):
+    def __init__(self, dataset: Dataset):
         """
-        :param dataset:
+        :param dataset: Dataset class
         """
         # self.input = input
         self.dataset = dataset
@@ -44,7 +44,7 @@ class NN:
 
     # Layer class
     class Layer:
-        def __init__(self, type, input_dim, output_dim, activation):
+        def __init__(self, type: str, input_dim, output_dim, activation):
             """
             :param type: Layer type, choose 'Linear', 'Conv' etc
             :param input_dim: input dim or previous layer's output
@@ -86,7 +86,7 @@ class NN:
             self.kernel_size = kernel_size
             self.stride = stride
             self.padding = padding
-        
+
         def getimagesize(self):
             return self.image_size
 
