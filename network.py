@@ -86,7 +86,7 @@ class NN:
             self.kernel_size = kernel_size
             self.stride = stride
             self.padding = padding
-
+        
         def getimagesize(self):
             return self.image_size
 
