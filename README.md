@@ -54,16 +54,16 @@ Version 0.0.1 provides plotloss() and plotgradientnorm() to plot loss flow and g
 
 Thus the whole training example is given as:
 
-layer_list = [NN.Layer('Linear',3,10,'LeakyReLU'),NN.Layer('Linear',10,3,'LeakyReLU'),
-              NN.Layer('Linear',3,1,'none')]
+layer_list = [NN.Layer('Linear', 3, 10, 'sigmoid'), NN.Layer('Linear', 10, 3, 'sigmoid'),
+              NN.Layer('Linear', 3, 1, 'none')]
 
-dataset = Dataset(X, y)
+dataset = Dataset(X, y, mini_batch=32)
 
 nn = NN(dataset)
 
 nn.addlayers(layer_list)
 
-optim = Optimizer(nn,"SGD",iter = 20000, lr=1e-6)
+optim = Optimizer(nn, "minibatchgd", epoch=10000, lr=1e-6)
 
 optim.train()
 
