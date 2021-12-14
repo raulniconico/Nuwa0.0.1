@@ -1,3 +1,4 @@
+
 import numpy as np
 import copy
 import network
@@ -182,6 +183,9 @@ class Optimizer:
         else:
             return
 
+    def lrdecay(self, epoch, decay_rate = 0.01):
+        self.lr =  1 / (1 + decay_rate * epoch)
+
     def GD(self, root, weight_list):
 
         Optimizer.backpropagation(root)
@@ -265,7 +269,7 @@ class Optimizer:
                 elif self.optimizer =="SGD":
                     self.weight_list[i+1], self.gradient_list[i]  = Optimizer.SGD(self, self.weight_list[i], self.passer_list[i])
 
-        elif self.optimizer =="minibatchgd":
+        elif self.optimizer =="minibatchgd" or self.optimizer =="Adam":
             for i in range(self.epoch):
                 # get mini batch
                 minisets = self.nn.dataset.gettrainset().getminiset()
@@ -292,5 +296,9 @@ class Optimizer:
 
                 self.loss_list[i] = sum(epoch_loss_list)/len(epoch_loss_list)
 
+                # learnign rate decay
+                self.lrdecay(i)
                 # every epoch shuffle the dataset
                 self.nn.dataset.distribute()
+
+
