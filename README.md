@@ -27,7 +27,8 @@ from optimizers import Optimizer
 
 from visualization import Visual
 ## <div align="center">Dataset class</div>
-We assume that X is the feature training data and y its respecting label, they have same lines and can be concatenated by their axis 1. Also you can distribute dataset into training and test dataset by certain given proportion. During the mini batch graident descent training, it can also provide mini batchs by using builtin function getminiset()
+By default, Dataset take X,y,proportion=0.8,shuffle=True, mini_batch=0 as variables and params. We assume that X is the feature training data and y its respecting label, they have same lines and can be concatenated by their axis 1. Also you can distribute dataset into training and test dataset by certain given proportion. During the mini batch graident descent training, it can also provide mini batchs by using builtin function getminiset(). It also provides shuffle methods, for example, in minibatch gradient descent, where each epoch can shuffle the dataset for avoiding optimizers parsing exactly the same data each epoch.
+
 
 ## <div align="center">NN class</div>
 NN simply represents "neural network". Since we have initialized dataset, we take it as variable and parse it in **NN** class. With the help of Layer class defined by NN, we can create a deep learning network like in the demo:
@@ -42,6 +43,8 @@ to initialize a linear layer, defaultly, type equals 'Linear' and activation is 
 These two methods are exactly the same except the latter automatically set the layer type as linear.
 
 ActivationFunc is a class which contains several static activation function methods: sigmoid, ReLU, LeakyReLU, tanh or none. it takes features from the last layer. You also have two methods to use activation functions. One is define inside **Layer** class. Or, **NN** provide activation function as **Layer**.
+
+Aim of this architecture design is that, this allows the freedom to organize the architecture of the neural network, allowing to try different batch normalization positions to achieve a better fit.
 
 All variables are as follows: type, input_dim, output_dim, activation, BN = False. 
 The last variable BN accepts a Boolean argument, if True, batch normalization will be performed and two complete examples are provided in **Nuwa.ipynb**.
@@ -71,16 +74,16 @@ Version 0.0.1 provides plotloss() and plotgradientnorm() to plot loss flow and g
 
 Thus the whole training example is given as:
 
-layer_list = [NN.Layer('Linear', 3, 10, 'sigmoid'), NN.Layer('Linear', 10, 3, 'sigmoid'),
-              NN.Layer('Linear', 3, 1, 'none')]
+layer_list = [NN.Layer('Linear',3,10,'sigmoid',BN=True), NN.Layer('Linear',10,100,'sigmoid',BN=True),
+              NN.Layer('Linear',100,10,'sigmoid',BN=True),NN.Layer('Linear',10,3,'none') ]
 
-dataset = Dataset(X, y, mini_batch=32)
+dataset = Dataset(X, y, mini_batch= 64)
 
 nn = NN(dataset)
 
 nn.addlayers(layer_list)
 
-optim = Optimizer(nn, "minibatchgd", epoch=10000, lr=1e-6)
+optim = Optimizer(nn,"minibatchgd",epoch = 1000, lr=1e-4, decay_rate=0.01)
 
 optim.train()
 
