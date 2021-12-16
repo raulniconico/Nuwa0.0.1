@@ -27,12 +27,23 @@ y = np.array(b * const + theta1 * x1 + theta2 * x2 + eps)
 y = np.reshape(y, (-1, 1))
 X = np.array([const, x1, x2]).T
 
-layer_list = [NN.Layer('Linear', 3, 10, 'sigmoid'), NN.Layer('Linear', 10, 3, 'sigmoid'),
-              NN.Layer('Linear', 3, 1, 'none')]
-dataset = Dataset(X, y, mini_batch=32)
+layer_list = [NN.Layer('Linear',3,10,'sigmoid',BN=True), NN.Layer('Linear',10,100,'sigmoid',BN=True),
+              NN.Layer('Linear',100,10,'sigmoid',BN=True),NN.Layer('Linear',10,3,'none') ]
+dataset = Dataset(X, y, mini_batch= 64)
 nn = NN(dataset)
 nn.addlayers(layer_list)
-optim = Optimizer(nn, "minibatchgd", epoch=10000, lr=1e-6)
+optim = Optimizer(nn,"minibatchgd",epoch = 1000, lr=1e-4, decay_rate=0.01)
+optim.train()
+visual = Visual(optim)
+visual.plotloss()
+visual.plotgradientnorm()
+
+layer_list = [NN.Layer('Linear',3,100,'LeakyReLU'),NN.Layer('Linear',100,3,'LeakyReLU'),
+              NN.Layer('Linear',3,1,'none')]
+dataset = Dataset(X, y)
+nn = NN(dataset)
+nn.addlayers(layer_list)
+optim = Optimizer(nn,"SGD",epoch = 10000, lr=1e-6)
 optim.train()
 visual = Visual(optim)
 visual.plotloss()

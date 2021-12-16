@@ -3,15 +3,16 @@ import numpy as np
 
 
 class NN:
-    def __init__(self, dataset: Dataset):
+    import numpy as np
+    def __init__(self,dataset):
         """
-        :param dataset: Dataset class
+        :param dataset:
         """
         # self.input = input
         self.dataset = dataset
         self.layer_list = []
 
-    def addlayers(self, layers):
+    def addlayers(self,layers):
         self.layer_list = layers
 
     def getlayers(self):
@@ -32,7 +33,7 @@ class NN:
 
         @staticmethod
         def LeakyReLU(x):
-            return np.where(x > 0, x, x * 0.01)
+            return  np.where(x > 0, x, x * 0.01)
 
         @staticmethod
         def tanh(x):
@@ -44,7 +45,7 @@ class NN:
 
     # Layer class
     class Layer:
-        def __init__(self, type: str, input_dim, output_dim, activation):
+        def __init__(self, type, input_dim, output_dim, activation, BN = False):
             """
             :param type: Layer type, choose 'Linear', 'Conv' etc
             :param input_dim: input dim or previous layer's output
@@ -55,6 +56,7 @@ class NN:
             self.input_dim = input_dim
             self.output_dim = output_dim
             self.activation = activation
+            self.BN = BN
 
         def getinputdim(self):
             return self.input_dim
@@ -66,18 +68,22 @@ class NN:
             return self.type
 
         def getact(self, x):
-            func_name = "NN.ActivationFunc." + self.activation
+            func_name = "NN.ActivationFunc."+self.activation
             func = eval(func_name)
             return func(x)
 
         def getactname(self):
             return self.activation
 
+        def getBN(self):
+            return self.BN
+
     class LinearLayer(Layer):
         def __init__(self, input_dim, output_dim):
             self.type = "Linear"
             self.input_dim = input_dim
             self.output_dim = output_dim
+
 
     class Conv2DLayer(Layer):
         def __init__(self, image_size, kernel_size, stride, padding):
@@ -102,4 +108,4 @@ class NN:
     class BN(Layer):
         def __init__(self):
             self.type = "BN"
-            self.activation = "none"
+            self.activation ="none"
