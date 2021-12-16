@@ -1,7 +1,8 @@
 # Nuwa_framework
-A deep learning framework powered by Zixing by using only numpy. 
+A deep learning framework powered by Zixing by using only numpy, aims to build a deep learning framework to compute partial differential equations with higher performance. This project is still in early development stage, and the underlying development of fully connected neural network and part of 2D CNN neural network has been completed. A dynamic back propagation graph is provided, it supports all latest optimizer, normalizations. The second phase will improve the project of the first phase to adapt it to the needs of computing partial differential equations. Finally, the Nuwa framework will be deployed as a C++ project and support CUDA and parallel computing. If you are interested in approving the deep learning framework calculation efficiency, you can contact me by my mail: zixing.qiu@etu.toulouse-inp.fr
 
-In the folder, you'll find:
+
+In this folder, you'll find:
 <br>
 <br>
   **1 Nuwa.ipynb:** A demo contains all the module of Nuwa framework, it contains 4 main parts of which the architecture will be represent later. It also provide a testing set, 
@@ -42,7 +43,8 @@ These two methods are exactly the same except the latter automatically set the l
 
 ActivationFunc is a class which contains several static activation function methods: sigmoid, ReLU, LeakyReLU, tanh or none. it takes features from the last layer. You also have two methods to use activation functions. One is define inside **Layer** class. Or, **NN** provide activation function as **Layer**.
 
-
+All variables are as follows: type, input_dim, output_dim, activation, BN = False. 
+The last variable BN accepts a Boolean argument, if True, batch normalization will be performed and two complete examples are provided in **Nuwa.ipynb**.
 
 ## <div align="center">Optimizer class</div>
 **Optimizer** is the most important class in the architecture of Nuwa, as the training process and testing process are provided by it:
@@ -57,7 +59,11 @@ ActivationFunc is a class which contains several static activation function meth
 
 Use following line as Optimizer init:
 
-optim = Optimizer(nn,"SGD",iter = 20000, lr=1e-6)
+optim = Optimizer(nn,"SGD",iter = 20000, lr=1e-6),
+
+if you are using mini batch gradient descent, use API as: 
+
+optim = Optimizer(nn,"minibatchgd",epoch = 1000, lr=1e-4, decay_rate=0.01)
 
 nn is an **NN** object, "SGD" is the optimize method to use, there are several options for now: "GD", "SGD", "minibatchgd". epoch = epoch numbers and lr the learning rate.
 ## <div align="center">Visual class</div>
