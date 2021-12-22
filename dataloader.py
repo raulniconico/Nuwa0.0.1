@@ -3,7 +3,7 @@ import random
 
 
 class Dataset:
-    def __init__(self,X,y,proportion=0.8,shuffle=True, mini_batch=0):
+    def __init__(self, X, y, proportion=0.8, shuffle=True, mini_batch=0):
         """
         Dataset class provide tools to manage dataset
 
@@ -21,7 +21,7 @@ class Dataset:
         self.proportion = proportion
         self.shuffle = shuffle
         self.mini_batch = mini_batch
-        self.allset = np.concatenate((X,y),axis=1)
+        self.allset = np.concatenate((X, y), axis=1)
         self.minisets = []
 
         if self.shuffle:
@@ -38,11 +38,11 @@ class Dataset:
         call this function to reshuffle all the dataset and also generate new train and test set
         """
         n = np.shape(self.X)[0]
-        samples = np.concatenate((self.X,self.y),axis=1)
+        samples = np.concatenate((self.X, self.y), axis=1)
         random.shuffle(samples)
         # sample train and test dataset
-        self.trainset = samples[0:round(n*self.proportion),:]
-        self.testset = samples[round(n*self.proportion)+1:, :]
+        self.trainset = samples[0:round(n * self.proportion), :]
+        self.testset = samples[round(n * self.proportion) + 1:, :]
 
     def getX(self):
         return self.X
@@ -57,13 +57,15 @@ class Dataset:
         """
         :return: return train dataset with respect of proportion
         """
-        return Dataset(self.trainset[:, 0:self.X.shape[1]], self.trainset[:, self.X.shape[1]:], mini_batch=self.mini_batch)
+        return Dataset(self.trainset[:, 0:self.X.shape[1]], self.trainset[:, self.X.shape[1]:],
+                       mini_batch=self.mini_batch)
 
     def gettestset(self):
         """
         :return: test dataset with respect of proportion
         """
-        return Dataset(self.testset[:, 0:self.X.shape[1]], self.testset[:, self.X.shape[1]:])
+        return Dataset(self.testset[:, 0:self.X.shape[1]], self.testset[:, self.X.shape[1]:],
+                       mini_batch=self.mini_batch)
 
     def getminiset(self):
         """
@@ -73,5 +75,7 @@ class Dataset:
         spilit_list = np.arange(self.mini_batch, self.allset.shape[0], self.mini_batch)
         minisets = np.split(self.allset, spilit_list)
         for i in range(len(minisets)):
-            self.minisets.append(Dataset(minisets[i][:, 0:self.X.shape[1]], minisets[i][:, self.X.shape[1]:],shuffle =False, mini_batch=self.mini_batch))
+            self.minisets.append(
+                Dataset(minisets[i][:, 0:self.X.shape[1]], minisets[i][:, self.X.shape[1]:], shuffle=False,
+                        mini_batch=self.mini_batch))
         return self.minisets

@@ -69,6 +69,12 @@ if you are using mini batch gradient descent, use API as:
     optim = Optimizer(nn,"minibatchgd",epoch = 1000, lr=1e-4, decay_rate=0.01)
 
 nn is an **NN** object, "SGD" is the optimize method to use, there are several options for now: "GD", "SGD", "minibatchgd". epoch = epoch numbers and lr the learning rate.
+
+For testing the trained weight on the testset or other feature data X, use following line:
+    
+    optim.train()
+    optim.predict(X)
+
 ## <div align="center">Visual class</div>
 Version 0.0.1 provides plotloss() and plotgradientnorm() to plot loss flow and gradient flow. More plots available in very soon
 
