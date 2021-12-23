@@ -13,11 +13,11 @@ In this folder, you'll find:
 <br>
 <br>
   **1 Nuwa.ipynb:** A demo contains all the module of Nuwa framework, it contains 4 main parts of which the architecture 
-will be represent later. It also provide a testing set, 
+will be represented later. It also provides a testing set, 
   you could try your own dataset following the guide.
 <br>  
   **2 Nuwa v0.0.1.png:** Nuwa v0.0.1's architecture, **Black bold** unit represents it's a python class while green 
-dashed line represents the relationship between these classes. For       example, **Dataset** class parse the dataset to
+dashed line represents the relationship between these classes. For example, **Dataset** class parse the dataset to
 **NN**. Details are in the following section.
 
   **3 demo.py:** Provide the same demo of two examples as Nuwa.ipynb.
@@ -27,12 +27,12 @@ Before start, use "pip install -r requirements.txt" to install all the requireme
 ## <div align="center">Architecture</div>
 The Nuwa framework consists of four parts in total: **Dataset**, **NN**, **Optimizer** and **Visual**. **Dataset** is 
 responsible for dataset allocation, pre-processing and IO, **NN** contains different kinds of neural network layer 
-such as fully connected layer, convolution layer etc, it also provide activation functions, it could be aclass which 
-inherite Layer class, or it can be contained in other layers like fully connected layer and be calculated at the end 
+such as fully connected layer, convolution layer etc, it also provides activation functions, it could be aclass which 
+inherit Layer class, or it can be contained in other layers like fully connected layer and be calculated at the end 
 of layer. **Optimizer** is a kind of "kernel" function of Nuwa. Inside, it provides optimizers like gradient descent 
-and SGD, also it provides training function for training and calculate backpropagation by using dynamic computation 
-graphe, each node in the graph is a **Node** type. It enables chain rule calculation be more efficient. You can always 
-moniter gradient flow to check if there is gradient vanish during training. At last, **Visual** provides a series graph 
+and Adam, also it provides training function for training and calculate backpropagation by using dynamic computation 
+graph, each node in the graph is a **Node** type. It enables chain rule calculation be more efficient. You can always 
+monitor gradient flow to check if there is gradient vanish during training. At last, **Visual** provides a series graph 
 tool for plotting loss list or the gradient flow.
 
     for using these four parts, import as following:
@@ -48,7 +48,7 @@ from visualization import Visual
 By default, Dataset take X,y,proportion=0.8,shuffle=True, mini_batch=0 as variables and params. We assume that X is the 
 feature training data and y its respecting label, they have same lines and can be concatenated by their axis 1. 
 Also you can distribute dataset into training and test dataset by certain given proportion. During the mini batch 
-graident descent training, it can also provide mini batchs by using builtin function getminiset(). It also provides 
+gradient descent training, it can also provide mini batches by using builtin function getminiset(). It also provides 
 shuffle methods, for example, in minibatch gradient descent, where each epoch can shuffle the dataset for avoiding 
 optimizers parsing exactly the same data each epoch.
 
@@ -64,7 +64,7 @@ one can also use
 
     LinearLayer(input_dim, output_dim) 
 
-to initialize a linear layer, defaultly, type equals 'Linear' and activation is None.
+to initialize a linear layer, default, type equals 'Linear' and activation is None.
 These two methods are exactly the same except the latter automatically set the layer type as linear.
 
 ActivationFunc is a class which contains several static activation function methods: sigmoid, ReLU, LeakyReLU, 
@@ -107,7 +107,7 @@ if you are using mini batch gradient descent, use API as:
     optim = Optimizer(nn,"minibatchgd",epoch = 1000, lr=1e-4, decay_rate=0.01)
 
 nn is an **NN** object, "SGD" is the optimize method to use, there are several options for now: "GD", "SGD", 
-"minibatchgd". epoch = epoch numbers and lr the learning rate.
+"minibatchgd", "momentumgd", "RMSprop" and "Adam". epoch = epoch numbers and lr the learning rate.
 
 For testing the trained weight on the testset or other feature data X, use following line:
     
@@ -118,7 +118,7 @@ For testing the trained weight on the testset or other feature data X, use follo
 Version 0.0.1 provides plotloss() and plotgradientnorm() to plot loss flow and gradient flow. More plots available in 
 very soon
 
-Thus the whole training example is given as:
+Thus, the whole training example is given as:
 
     layer_list = [NN.Layer('Linear',3,10,'sigmoid',BN=True), NN.Layer('Linear',10,100,'sigmoid',BN=True),
                   NN.Layer('Linear',100,10,'sigmoid',BN=True),NN.Layer('Linear',10,3,'none') ]
