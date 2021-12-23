@@ -3,10 +3,11 @@ import numpy as np
 
 
 class NN:
-    import numpy as np
+
     def __init__(self, dataset):
         """
-        This class contains Activation function util class, Layer class for construct networks, it contains several extend classes like LinearLayer, Conv2D etc.
+        This class contains Activation function util class, Layer class for construct networks, it contains several
+        extend classes like LinearLayer, Conv2D etc.
 
         Examples:
 
