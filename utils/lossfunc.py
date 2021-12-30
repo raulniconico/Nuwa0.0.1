@@ -20,7 +20,7 @@ class LossFunc:
             We are using Logarithmic Loss
             http://scikit-learn.org/stable/modules/model_evaluation.html#log-loss
             """
-            super.__init__(y_true, y_pred)
+            super().__init__(y_true, y_pred)
             self.eps = eps
             self.name = "Logarithmic"
 

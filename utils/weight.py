@@ -1,5 +1,5 @@
 import numpy as np
-from node import Node
+from utils.node import Node
 
 
 class WeightIni:
