@@ -1,3 +1,7 @@
+import os
+import re
+import shutil
+
 import numpy as np
 from utils.node import Node
 
@@ -62,3 +66,10 @@ class WeightIni:
                 weight_list.append(Node(beta, "weight"))
 
         return weight_list
+
+
+def saveweight(weight):
+
+    if not os.path.isdir('runs'):
+        os.makedirs("runs")
+
