@@ -68,17 +68,19 @@ class WeightIni:
         return weight_list
 
 
-def saveweight(weight):
-    if not os.path.isdir('runs/train'):
-        os.makedirs("runs/train")
+def saveweight(weight, path='runs/train'):
+    if not os.path.isdir(path):
+        os.makedirs(path)
 
     i = 0
     while True:
-        if os.path.isfile("runs/train/weight" + str(i)):
-            np.save("runs/train/weight" + str(i), weight)
+        if not os.path.isfile(path + "weight" + str(i)):
+            np.save(path + "weight" + str(i), weight)
+            break
         else:
             pass
         i += 1
+    return path + "weight" + str(i)
 
 
 def readweight(path):
