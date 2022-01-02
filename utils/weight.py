@@ -74,13 +74,14 @@ def saveweight(weight, path='runs/train'):
 
     i = 0
     while True:
-        if not os.path.isfile(path + "weight" + str(i)):
-            np.save(path + "weight" + str(i), weight)
+        filepath = os.path.join(path, "weight" + str(i))
+        if not os.path.isfile(filepath):
+            np.save(filepath, weight)
             break
         else:
             pass
         i += 1
-    return path + "weight" + str(i)
+    return filepath
 
 
 def readweight(path):
