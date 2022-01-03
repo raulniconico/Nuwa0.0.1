@@ -3,7 +3,7 @@ import random
 
 
 class Dataset:
-    def __init__(self, X, y, proportion=0.8, shuffle=True, mini_batch=0):
+    def __init__(self, X=None, y=None, proportion=0.8, shuffle=False, mini_batch=0):
         """
         Dataset class provide tools to manage dataset
 
@@ -21,16 +21,21 @@ class Dataset:
         self.proportion = proportion
         self.shuffle = shuffle
         self.mini_batch = mini_batch
-        self.allset = np.concatenate((X, y), axis=1)
+        self.allset = None
         self.minisets = []
 
-        if self.shuffle:
-            # automatic distribution
+        # automatic distribution
+        if self.X is not None and self.y is not None:
             self.distribute()
 
     # @classmethod
     # def imageset(cls, path, proportion = 0.8, shuffle = None):
     #     pass
+
+    def add(self, X, y):
+        self.X = X
+        self.y = y
+        self.distribute()
 
     def distribute(self):
         """
@@ -39,16 +44,21 @@ class Dataset:
         """
         n = np.shape(self.X)[0]
         samples = np.concatenate((self.X, self.y), axis=1)
-        random.shuffle(samples)
+        if self.shuffle:
+            random.shuffle(samples)
         # sample train and test dataset
         self.trainset = samples[0:round(n * self.proportion), :]
         self.testset = samples[round(n * self.proportion) + 1:, :]
+        self.allset = np.concatenate((self.X, self.y), axis=1)
 
     def getX(self):
         return self.X
 
     def gety(self):
         return self.y
+
+    def getallset(self):
+        return self.allset
 
     def getminibatch(self):
         return self.mini_batch
@@ -79,3 +89,21 @@ class Dataset:
                 Dataset(minisets[i][:, 0:self.X.shape[1]], minisets[i][:, self.X.shape[1]:], shuffle=False,
                         mini_batch=self.mini_batch))
         return self.minisets
+
+    def concatenate(self, dataset, axis=0):
+        self.X = np.concatenate((self.getX(), dataset.getX()), axis=axis)
+        self.y = np.concatenate((self.gety(), dataset.gety()), axis=axis)
+        self.allset = np.concatenate((self.X, self.y), axis=1)
+        self.distribute()
+
+
+def concatenate(datasets, axis=0):
+    dataset = Dataset()
+    for set in datasets:
+        if dataset.getX() is None or dataset.getX() is None:
+            dataset.add(set.getX(), set.gety())
+        else:
+            dataset.concatenate(set, axis=axis)
+    dataset.distribute()
+
+    return dataset

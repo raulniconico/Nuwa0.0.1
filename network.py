@@ -3,11 +3,10 @@ import numpy as np
 
 
 class NN:
-
-    def __init__(self, dataset):
+    import numpy as np
+    def __init__(self, layer_list=None):
         """
-        This class contains Activation function util class, Layer class for construct networks, it contains several
-        extend classes like LinearLayer, Conv2D etc.
+        This class contains Activation function util class, Layer class for construct networks, it contains several extend classes like LinearLayer, Conv2D etc.
 
         Examples:
 
@@ -25,11 +24,10 @@ class NN:
         :param dataset: Dataset class
         """
         # self.input = input
-        self.dataset = dataset
-        self.layer_list = []
+        self.layer_list = layer_list
 
-    def addlayers(self, layers):
-        self.layer_list = layers
+    def addlayers(self, layer_list):
+        self.layer_list = layer_list
 
     def getlayers(self):
         return self.layer_list
@@ -144,8 +142,8 @@ class NN:
             self.stride = stride
             self.padding = padding
 
-        def getimagesize(self):
-            return self.image_size
+        def getinputsize(self):
+            return self.input_size
 
         def getkernelsize(self):
             return self.kernel_size
