@@ -485,77 +485,54 @@ class Optimizer:
         self.gradient_list = [[] for i in range(self.epoch)]
         self.passer_list = [[] for i in range(self.epoch)]
 
-        # for GD and SGD, they use full dataset, so need only read X and y once
-        if self.optimizer == "GD" or self.optimizer == "SGD":
-            X = self.dataset.gettrainset().getX()
-            X = Node(X, "data")
-            for i in range(self.epoch):
-                # forward propagation
-                self.passer_list[i] = Optimizer.forword(X.getdata(), self.weight_list[i], layer_list)
-                root = self.passer_list[i][-1]
-
-                # calculate loss by using: loss 2 * (-self.dataset.gettrainset().gety() + root.getdata())
-                loss_func = self.loss_function(self.dataset.gettrainset().gety(), root.getdata())
-                self.loss_list[i] = loss_func.loss()
-
-                root.back = loss_func.diff()
-                # upgrade gradient by selected optimizer
-                if self.optimizer == "GD":
-                    self.weight_list[i + 1], self.gradient_list[i] = GD(root, self.weight_list[i], lr=self.lr)
-
-                elif self.optimizer == "SGD":
-                    self.weight_list[i + 1], self.gradient_list[i] = SGD(self.dataset, self.weight_list[i],
-                                                                         self.passer_list[i])
-
         # mini batch type gradient descent
-        else:
-            for i in range(self.epoch):
-                start_time = time.time()
-                # get mini batch
+        for i in range(self.epoch):
+            start_time = time.time()
 
-                minisets = self.dataset.gettrainset().getminiset()
-                epoch_weight_list = [copy.deepcopy(self.weight_list[i])]
-                epoch_loss_list = np.zeros(len(minisets))
+            # get mini batch
+            minisets = self.dataset.gettrainset().getminiset()
+            epoch_weight_list = [copy.deepcopy(self.weight_list[i])]
+            epoch_loss_list = np.zeros(len(minisets))
 
-                # GD for every mini batch
-                for j in range(len(minisets)):
-                    X_bar = minisets[j]
-                    self.passer_list[i].append(Optimizer.forword(X_bar.getX(), epoch_weight_list[j], layer_list))
+            # GD for every mini batch
+            for j in range(len(minisets)):
+                X_bar = minisets[j]
+                self.passer_list[i].append(Optimizer.forword(X_bar.getX(), epoch_weight_list[j], layer_list))
 
-                    root = self.passer_list[i][j][-1]
-                    loss_func = self.loss_function(X_bar.gety(), root.getdata())
+                root = self.passer_list[i][j][-1]
+                loss_func = self.loss_function(X_bar.gety(), root.getdata())
 
-                    epoch_loss_list[j] = loss_func.loss()
-                    root.back = loss_func.diff()
-                    root.momentum = root.getback()
+                epoch_loss_list[j] = loss_func.loss()
+                root.back = loss_func.diff()
+                root.momentum = root.getback()
 
-                    if self.optimizer == "minibatchgd":
-                        weight, gradient = GD(root, epoch_weight_list[j], lr=self.lr)
-                    elif self.optimizer == "momentumgd":
-                        weight, gradient = momentumgd(root, epoch_weight_list[j], lr=self.lr)
-                    elif self.optimizer == "RMSprop":
-                        weight, gradient = RMSprop(root, epoch_weight_list[j], lr=self.lr)
-                    elif self.optimizer == "Adam":
-                        weight, gradient = Adam(root, epoch_weight_list[j], lr=self.lr)
-                    else:
-                        raise NameError
-                    epoch_weight_list.append(weight)
+                if self.optimizer == "minibatchgd":
+                    weight, gradient = GD(root, epoch_weight_list[j], lr=self.lr)
+                elif self.optimizer == "momentumgd":
+                    weight, gradient = momentumgd(root, epoch_weight_list[j], lr=self.lr)
+                elif self.optimizer == "RMSprop":
+                    weight, gradient = RMSprop(root, epoch_weight_list[j], lr=self.lr)
+                elif self.optimizer == "Adam":
+                    weight, gradient = Adam(root, epoch_weight_list[j], lr=self.lr)
+                else:
+                    raise NameError
+                epoch_weight_list.append(weight)
 
-                self.weight_list[i + 1] = epoch_weight_list[-1]
-                self.gradient_list[i] = gradient
+            self.weight_list[i + 1] = epoch_weight_list[-1]
+            self.gradient_list[i] = gradient
 
-                self.loss_list[i] = sum(epoch_loss_list) / len(epoch_loss_list)
+            self.loss_list[i] = sum(epoch_loss_list) / len(epoch_loss_list)
 
-                # learning rate decay
+            # learning rate decay
 
-                self.lrdecay(i)
-                # every epoch shuffle the dataset
-                self.dataset.distribute()
+            self.lrdecay(i)
+            # every epoch shuffle the dataset
+            self.dataset.distribute()
 
-                if (i + 1) % 10 == 0:
-                    used_time = time.time() - start_time
-                    print("epoch " + str(i + 1) + ', Training time: %.4f' % used_time + ', Training loss: %.6f' %
-                          self.loss_list[i])
+            if (i + 1) % 10 == 0:
+                used_time = time.time() - start_time
+                print("epoch " + str(i + 1) + ', Training time: %.4f' % used_time + ', Training loss: %.6f' %
+                      self.loss_list[i])
 
     def test(self):
         """
