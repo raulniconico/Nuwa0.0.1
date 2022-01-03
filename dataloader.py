@@ -107,3 +107,91 @@ def concatenate(datasets, axis=0):
     dataset.distribute()
 
     return dataset
+
+
+class DatasetPI2D:
+    def __init__(self, h, x, t, sample_size=None, proportion=0.8, mini_batch=32):
+        """
+
+        :param h:
+        :param x:
+        :param t:
+        :param sample_size: array_like, [N_0, N_b, N_f]
+        :param proportion:
+        :param mini_batch:
+        """
+        self.h = h
+        self.x = x
+        self.t = t
+        self.sample_size = sample_size
+        self.proportion = proportion
+        self.mini_batch = mini_batch
+
+        self.u = np.real(h)
+        self.v = np.imag(h)
+        self.h_norm = np.sqrt(self.u ** 2 + self.v ** 2)
+
+        self.initset = None
+        self.innerset = None
+        self.boundaryset = None
+
+        self.trainset = None
+        self.testset = None
+
+        self.distribute()
+
+    def getinitset(self, sample_size=1):
+        # initial data
+        t0 = np.zeros(self.x.shape[0])
+        u0 = self.u[:, 0]
+        v0 = self.v[:, 0]
+        return Dataset(np.concatenate((self.x, t0[:, None]), axis=1),
+                       np.concatenate((u0[:, None], v0[:, None]), axis=1), proportion=sample_size,
+                       mini_batch=self.mini_batch)
+
+    def getupboundaryset(self, sample_size=1):
+        x_ub = np.repeat(self.x[0], self.t.shape[0])
+        u_ub = self.u[0, :]
+        v_ub = self.v[0, :]
+        return Dataset(np.concatenate((x_ub[:, None], self.t), axis=1),
+                       np.concatenate((u_ub[:, None], v_ub[:, None]), axis=1), proportion=sample_size,
+                       mini_batch=self.mini_batch)
+
+    def getlowboundaryset(self, sample_size=1):
+        x_lb = np.repeat(self.x[-1], self.t.shape[0])
+        u_lb = self.u[-1, :]
+        v_lb = self.v[-1, :]
+        return Dataset(np.concatenate((x_lb[:, None], self.t), axis=1),
+                       np.concatenate((u_lb[:, None], v_lb[:, None]), axis=1), proportion=sample_size,
+                       mini_batch=self.mini_batch)
+
+    def getboundaryset(self, sample_size=1):
+        x_b = np.repeat(self.x[[0, -1]], self.t.shape[0])
+        u_b = np.concatenate((self.u[0, :], self.u[-1, :]), axis=0)
+        v_b = np.concatenate((self.v[0, :], self.v[-1, :]), axis=0)
+        return Dataset(np.concatenate((x_b[:, None], np.tile(self.t, 2).flatten()[:, None]), axis=1),
+                       np.concatenate((u_b[:, None], v_b[:, None]), axis=1), proportion=sample_size,
+                       mini_batch=self.mini_batch)
+
+    def getinnerset(self, sample_size=1):
+        u_in = self.u[1: -1, 1: -1].flatten()
+        v_in = self.v[1: -1, 1: -1].flatten()
+        x_in = np.tile(self.x[1: -1], self.t.shape[0] - 2).flatten()
+        t_in = np.repeat(self.t[1: -1], self.x.shape[0] - 2)
+        return Dataset(np.concatenate((x_in[:, None], t_in[:, None]), axis=1),
+                       np.concatenate((u_in[:, None], v_in[:, None]), axis=1), proportion=sample_size,
+                       mini_batch=self.mini_batch)
+
+    def distribute(self):
+        self.initset = self.getinitset(sample_size=self.sample_size[0])
+        self.boundaryset = self.getboundaryset(sample_size=self.sample_size[1])
+        self.innerset = self.getinnerset(sample_size=self.sample_size[2])
+
+        self.trainset = [self.initset.gettrainset(), self.boundaryset.gettrainset(), self.innerset.gettrainset()]
+        self.testset = [self.initset.gettestset(), self.boundaryset.gettestset(), self.innerset.gettestset()]
+
+    def gettrainset(self):
+        return self.trainset
+
+    def gettestset(self):
+        return self.testset
