@@ -10,7 +10,7 @@ warnings.filterwarnings("ignore")
 
 
 class Node:
-    def __init__(self, data: np.ndarray, type: str):
+    def __init__(self, data, type: str):
         """
         Node class, is the node of binary tree which has two child node: left and right.
         It can also be presented as weight. Every passer during the back propagation is saved as
@@ -28,6 +28,7 @@ class Node:
         self.back = None
         self.cache = None
         self.momentum = None
+        self.parent = None
 
     def getleft(self):
         return self.left
@@ -47,6 +48,8 @@ class Node:
     def getmomentum(self):
         return self.momentum
 
+    def getparent(self):
+        return self.parent
 
 class LossFunc:
     class Loss:
