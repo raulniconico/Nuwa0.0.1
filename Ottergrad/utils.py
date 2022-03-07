@@ -1,8 +1,7 @@
-import numpy
 import numpy as np
 
 
-dtype = numpy.float16
+dtype = np.float16
 epsilon = 1e-8
 
 
