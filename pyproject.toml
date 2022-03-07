@@ -1,0 +1,10 @@
+[build-system]
+# Minimum requirements for the build system to execute.
+requires = [
+    # "Cython==0.29.24,<3.0",  # Note: keep in sync with tools/cythonize.py
+    "matplotlib>=3.2.2",
+    "numpy>=1.18.5",
+    "setuptools>=42",
+    "wheel",
+#    "Ottergrad"
+]
