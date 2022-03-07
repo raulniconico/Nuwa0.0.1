@@ -1,8 +1,5 @@
-
-import Ottergrad.autograd as ag
-from Ottergrad.autograd import Func
-import Ottergrad.otternumpy as otnp
-from Ottergrad.autograd import checktensor
+from Ottergrad.autograd import Func, checktensor
+import Ottergrad.otternumpy as on
 
 
 class _Sigmoid(Func):
@@ -13,9 +10,9 @@ class _Sigmoid(Func):
         """
         Sigmoid function
         """
-        func = 1.0 / (1.0 + otnp.exp(-x))
-        self.setroot(func)
-        return func
+        tensor = 1.0 / (1.0 + on.exp(-x))
+        self.setroot(tensor)
+        return tensor
 
 
 @checktensor
@@ -33,9 +30,9 @@ class _ReLU(Func):
         :param x: ndarray,
         :return:
         """
-        func = ag.Func(otnp.maximum(0, x))
-        self.setroot(func)
-        return func
+        tensor = on.maximum(0, x)
+        self.setroot(tensor)
+        return tensor
 
 
 @checktensor
@@ -49,11 +46,12 @@ class _LeakyReLU(Func):
         super().__init__()
 
     def __call__(self, x):
-        func = ag.Func(otnp.where(x > 0, x, x * 0.01))
-        self.setroot(func)
-        return func
+        tensor = on.where(x > 0, x, x * 0.01)
+        self.setroot(tensor)
+        return tensor
 
 
+@checktensor
 def LeakyReLU(x):
     func = _LeakyReLU()
     return func(x)
@@ -64,9 +62,9 @@ class _tanh(Func):
         super().__init__()
 
     def __call__(self, x):
-        func = ag.Func(otnp.tanh(x))
-        self.setroot(func)
-        return func
+        tensor = on.tanh(x)
+        self.setroot(tensor)
+        return tensor
 
 
 @checktensor
