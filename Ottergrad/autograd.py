@@ -1,14 +1,12 @@
-import copy
-from operator import __matmul__
 import numpy as np
 from numpy import ndarray
 from inspect import signature
-
+from Ottergrad.utils import getepsilon
 import Ottergrad
 
 
 def checktensor(operator):
-    def check(*args):
+    def check(*args, **kwargs):
         arg_list = []
         for arg in args:
             if type(arg) is not Tensor:
@@ -66,6 +64,7 @@ class Tensor:
     def __init__(self, data=None, isgrad=True, *args, **kwargs):
         self.data = None
         self.grad = None
+        self.momentum = None
         self.left = None
         self.right = None
         self.type = "weight"
@@ -81,6 +80,28 @@ class Tensor:
         self.setkwargs(list(kwargs))
         self.setdata(data)
 
+    def __getitem__(self, item):
+        forwardfunc = self.forwardfunc
+        index = item
+
+        def _forwardfunc(node):
+            forwardfunc(node)
+            node.setdata(node.getdata()[index])
+
+        def _gradient(*args):
+            pass
+
+        if self.data is not None:
+            tensor = Tensor(self.data[item])
+        else:
+            tensor = Tensor()
+        tensor.left = self
+        tensor.type = self.type
+        tensor.isgrad = False
+        tensor.forwardfunc = _forwardfunc
+        tensor.gradfunc = _gradient
+        return tensor
+
     @checktensor
     def __add__(self, other):
         def _forwardfunc(node):
@@ -88,14 +109,12 @@ class Tensor:
 
         @checkgradisnone
         def _gradient(node):
-            if node.getleft().getisconst():
+            if node.getleft().shape() != node.getright().shape():
                 node.getleft().setgrad(node.getleft().getgrad() + np.sum(node.getgrad(), axis=0))
+                node.getright().setgrad(node.getright().getgrad() + np.sum(node.getgrad(), axis=0))
+
             else:
                 node.getleft().setgrad(node.getleft().getgrad() + node.getgrad())
-
-            if node.getright().getisconst():
-                node.getright().setgrad(node.getright().getgrad() + np.sum(node.getgrad(), axis=0))
-            else:
                 node.getright().setgrad(node.getright().getgrad() + node.getgrad())
 
         tensor = Tensor()
@@ -104,6 +123,7 @@ class Tensor:
         tensor.setright(other)
         tensor.setgradfunc(_gradient)
         tensor.setforwardfunc(_forwardfunc)
+
         return tensor
 
     @checktensor
@@ -173,7 +193,10 @@ class Tensor:
 
         @checkgradisnone
         def _gradient(node):
-            node.getleft().setgrad(node.getleft().getgrad() + np.multiply(node.getright().getdata(), node.getgrad()))
+            if node.getleft().getdata().shape == node.getright().getdata().shape:
+                node.getleft().setgrad(node.getleft().getgrad() + np.multiply(node.getright().getdata(), node.getgrad()))
+            else:
+                node.getleft().setgrad(node.getleft().getgrad() + np.sum(np.multiply(node.getright().getdata(), node.getgrad()), axis=0))
             node.getright().setgrad(node.getright().getgrad() + np.multiply(node.getleft().getdata(), node.getgrad()))
 
         tensor = Tensor()
@@ -186,10 +209,11 @@ class Tensor:
 
     @checktensor
     def __rmul__(self, other):
-        def _forwardfunc(node):
+        def _forwardfunc(node) -> None:
             node.setdata(np.multiply(node.getleft().getdata(), node.getright().getdata()))
 
-        def _gradient(node):
+        @checkgradisnone
+        def _gradient(node) -> None:
             node.getleft().setgrad(node.getleft().getgrad() + np.multiply(node.getright().getdata(), node.getgrad()))
             node.getright().setgrad(node.getright().getgrad() + np.multiply(node.getleft().getdata(), node.getgrad()))
 
@@ -203,15 +227,15 @@ class Tensor:
 
     @checktensor
     def __truediv__(self, other):
-        def _forwardfunc(node):
+        def _forwardfunc(node) -> None:
             node.setdata(np.divide(node.getleft().getdata(), node.getright().getdata()))
 
         @checkgradisnone
-        def _gradient(node: Tensor):
+        def _gradient(node: Tensor) -> None:
             node.getleft().setgrad(node.getleft().getgrad() +
-                                   np.dot(np.divide(1, node.getright().getdata()), node.getgrad()))
+                                   np.multiply(np.divide(1, node.getright().getdata()), node.getgrad()))
             node.getright().setgrad(
-                node.getright().getgrad() + np.dot(node.getleft().getdata(), -node.getright().getdata() ** -2))
+                node.getright().getgrad() + np.multiply(node.getleft().getdata(), -node.getright().getdata() ** -2))
 
         tensor = Tensor()
         tensor.type = ndarray.__truediv__
@@ -223,11 +247,11 @@ class Tensor:
 
     @checktensor
     def __rtruediv__(self, other):
-        def _forwardfunc(node):
+        def _forwardfunc(node) -> None:
             node.setdata(np.divide(node.getright().getdata(), node.getleft().getdata()))
 
         @checkgradisnone
-        def _gradient(node):
+        def _gradient(node) -> None:
             node.getleft().setgrad(
                 node.getleft().getgrad() + np.dot(node.getleft().getdata(), -node.getright().getdata() ** -2))
             node.getright().setgrad(
@@ -243,17 +267,25 @@ class Tensor:
 
     @checktensor
     def __pow__(self, power, modulo=None):
-        def _forward(node):
+        def _forward(node) -> None:
             node.setdata(np.power(node.getleft().getdata(), node.getright().getdata()))
 
         @checkgradisnone
-        def _gradient(node):
+        def _gradient(node) -> None:
+            epsilon = getepsilon()
             node.getleft().setgrad(node.getleft().getgrad() +
-                                   np.dot(node.getgrad().T, np.dot(node.getright().getdata(),
+                                   np.multiply(node.getgrad(), np.multiply(node.getright().getdata(),
                                                                    node.getleft().getdata() ** (
                                                                            node.getright().getdata() - 1))))
+
+            node.getleft().data = np.where(np.abs(node.getleft().getdata()) > epsilon, node.getleft().getdata(),
+                                           np.sign(node.getleft().getdata()) * epsilon)
+
+            node.getleft().data = np.where(node.getleft().getdata() == 0., epsilon, node.getleft().getdata())
+
             node.getright().setgrad(node.getright().getgrad() +
-                                    np.dot(node.getgrad()).T, np.dot(node.getgrad(), np.log(node.getleft().getdata())))
+                                    np.multiply(node.getgrad(), np.multiply(node.getleft().getdata(),
+                                                                            np.log(node.getleft().getdata()))))
 
         tensor = Tensor()
         tensor.type = ndarray.__pow__
@@ -265,11 +297,11 @@ class Tensor:
 
     @checktensor
     def __rpow__(self, other):
-        def _forward(node):
+        def _forward(node) -> None:
             node.setdata(np.power(node.getright().getdata(), node.getleft().getdata()))
 
         @checkgradisnone
-        def _gradient(node):
+        def _gradient(node) -> None:
             node.getleft().setgrad(node.getleft().getgrad() +
                                    np.dot(node.getgrad()).T, np.dot(node.getgrad(), np.log(node.getleft().getdata())))
 
@@ -288,11 +320,11 @@ class Tensor:
 
     @checktensor
     def __neg__(self):
-        def _forward(node):
+        def _forward(node) -> None:
             node.setdata(-node.getleft().getdata())
 
         @checkgradisnone
-        def _gradient(node):
+        def _gradient(node) -> None:
             node.getleft().setgrad(node.getleft().getgrad() - node.getgrad())
 
         tensor = Tensor()
@@ -304,31 +336,38 @@ class Tensor:
 
     @checktensor
     def __matmul__(self, other):
-
         return Ottergrad.otternumpy.dot(self, other)
 
     @checktensor
     def __gt__(self, other):
-        def _forward(node):
+        def _forward(node) -> None:
             node.setdata(np.greater(node.getleft().getdata(), node.getright().getdata()))
+
+        def _gradient(*args) -> None:
+            pass
 
         tensor = Tensor()
         tensor.type = np.greater
         tensor.setleft(self)
         tensor.setright(other)
         tensor.setforwardfunc(_forward)
+        tensor.setgradfunc(_gradient)
         return tensor
 
     @checktensor
     def __lt__(self, other):
-        def _forward(node):
+        def _forward(node) -> None:
             node.setdata(np.less(node.getleft().getdata(), node.getright().getdata()))
+
+        def _gradient(*args) -> None:
+            pass
 
         tensor = Tensor()
         tensor.type = np.less
         tensor.setleft(self)
         tensor.setright(other)
         tensor.setforwardfunc(_forward)
+        tensor.setgradfunc(_gradient)
         return tensor
 
     def getdata(self):
@@ -358,6 +397,9 @@ class Tensor:
     def gettype(self):
         return self.type
 
+    def setmomentum(self, momentum):
+        self.momentum = momentum
+
     def getmomentum(self):
         return self.momentum
 
@@ -371,18 +413,28 @@ class Tensor:
         return self.args
 
     def setargs(self, args):
-        if args == []:
-            self.args = None
-        else:
+        try:
+            _ = (arg for arg in args)
+            if args == []:
+                self.args = None
+            else:
+                self.args = args
+        except:
+            args = {args}
             self.args = args
 
     def getkwargs(self):
         return self.kwargs
 
     def setkwargs(self, kwargs):
-        if kwargs == []:
-            self.kwargs = None
-        else:
+        try:
+            _ = (kwarg for kwarg in kwargs)
+            if kwargs == []:
+                self.kwargs = None
+            else:
+                self.kwargs = kwargs
+        except:
+            kwargs = {kwargs}
             self.kwargs = kwargs
 
     def getgradfunc(self):
@@ -396,6 +448,27 @@ class Tensor:
 
     def setforwardfunc(self, func):
         self.forwardfunc = func
+
+    def shape(self):
+        def _forwardfunc(node):
+            node.setdata(np.shape(node.getleft().getdata()))
+
+        def _gradient(*args):
+            pass
+
+        if self.data is not None:
+            return np.shape(self.data)
+        else:
+            tensor = Tensor()
+            tensor.setleft(self)
+            tensor.type = np.shape
+            tensor.isgrad = False
+            tensor.setforwardfunc(_forwardfunc)
+            tensor.setgradfunc(_gradient)
+            return tensor
+
+    def T(self):
+        return np.transpose(self.data)
 
 
 class Graph:
@@ -418,17 +491,17 @@ class Graph:
     def getroot(self):
         return self.root
 
-    def backpropagation(self):
+    def backpropagation(self) -> Tensor:
 
         def backward(node):
             epsilon = Ottergrad.utils.getepsilon()
-
             if node.getleft() is not None and node.getgradfunc() is not None:
                 gradfunc = node.getgradfunc()
                 gradfunc(node)
                 backward(node.getleft())
                 if node.getright() is not None:
                     backward(node.getright())
+                    return
             else:
                 return
 
@@ -440,44 +513,6 @@ class Graph:
 
     def forwardpropagation(self):
         def forward(node: Tensor):
-
-            # if node.getargs() is not None:
-            #     try:
-            #         args = []
-            #         for arg in node.getargs():
-            #             if type(arg) is Tensor:
-            #                 forward(arg)
-            #                 args.append(arg.getdata())
-            #             else:
-            #                 args.append(arg)
-            #         node.args = args
-            #
-            #     except:
-            #
-            #         if type(node.getargs()) is Tensor:
-            #             forward(node.getargs())
-            #             node.args = node.getargs().getdata()
-            #
-            # if node.getkwargs() is not None:
-            #     try:
-            #         kwargs = []
-            #         for kwarg in node.getkwargs():
-            #             if type(kwarg) is Tensor:
-            #                 forward(kwarg)
-            #                 kwargs.append(kwarg.getdata())
-            #             else:
-            #                 kwargs.append(kwarg)
-            #         node.kwargs = kwargs
-            #
-            #     except:
-            #         if type(node.getkwargs()) is Tensor:
-            #             forward(node.getkwargs())
-            #             node.kwargs = node.getkwargs().getdata()
-            #
-            # if type(node.getdata()) is Tensor:
-            #     forward(node.getdata())
-            #     node.data = node.getdata().getdata()
-
             if node.getleft() is not None:
                 if node.getleft().getdata() is None:
                     forward(node.getleft())
@@ -490,10 +525,29 @@ class Graph:
             if func is not None:
                 func(node)
             else:
-                print(str(node.getdata()) + " has no forward function")
+                pass
             return
 
         forward(self.getroot())
+        return self.getroot()
+
+    def through_graph(self, func=None):
+        def through(node: Tensor):
+
+            if node.getleft() is not None:
+                through(node.getleft())
+
+                if node.getright() is not None:
+                    through(node.getright())
+
+            if func is not None:
+                func(node)
+            else:
+                pass
+
+            return
+
+        through(self.getroot())
         return self.getroot()
 
 
@@ -505,6 +559,27 @@ class Func:
         self.weight_list = None
 
         self.setroot(root)
+
+    def __call__(self, *args, **kwargs):
+        self.setroot(args)
+        # if type(x) is Tensor:
+        #     self.getinput().setleft(x)
+        # elif type(x) is Func:
+        #     self.getinput().setleft(x.getroot())
+
+        # if y is not None:
+        #     if type(y) is Tensor:
+        #         self.getinput().setright(y)
+        #     elif type(y) is Func:
+        #         self.getinput().setright(x.getroot())
+        return self
+
+    def __add__(self, other):
+        tensor = self.getroot() + other.getroot()
+        func = Func(tensor)
+        if self.getroot().getdata() is not None and other.getroot().getdata() is not None:
+            func.forward()
+        return func
 
     @classmethod
     def fromfunction(cls, func):
@@ -537,33 +612,16 @@ class Func:
             self.graph = Graph(self.root)
 
     def forward(self):
+        assert self.root is not None, "No root set"
         result = self.graph.forwardpropagation()
         return result.getdata()
 
-    def backward(self):
+    def backward(self) -> Tensor:
         root = self.graph.backpropagation()
         return root
 
     def getgraph(self):
+        assert self.root is not None, "no root been set"
+        self.setroot(self.root)
         return self.graph
 
-
-class Optim:
-    def __init__(self, func: Func = None, optimizer=None, batch_size=32, epoch=20000, lr=0.0001,
-                 decay_rate=0, pretrained=None):
-        self.graph = Graph()
-        self.func = func
-        self.weight_list = None
-        self.gradient_list = None
-        self.loss_list = None
-        self.passer_list = None
-
-        self.optimizer = optimizer
-        self.batch_size = batch_size
-        self.epoch = epoch
-        self.lr = lr
-
-        self.decay_rate = decay_rate
-        self.pretrained = pretrained
-
-    # def forward(self):
