@@ -1,4 +1,7 @@
 import re
+
+import numpy as np
+
 from Ottergrad.autograd import Tensor as Node
 
 
@@ -43,3 +46,6 @@ def str2ops(func: str):
 
 
 str2ops("1 + 3 * 4 * a")
+
+
+

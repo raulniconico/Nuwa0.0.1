@@ -1,4 +1,4 @@
-__all__ = ["autograd", "loss", "utils", "otternumpy"]
+__all__ = ["autograd", "nn", "utils", "otternumpy"]
 __author__ = 'Zixing'
 
 

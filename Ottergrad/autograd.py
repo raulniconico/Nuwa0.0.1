@@ -1,7 +1,7 @@
 import numpy as np
 from numpy import ndarray
 from inspect import signature
-from Ottergrad.utils import getepsilon
+from Ottergrad.utils import getepsilon, checkgradisnone, getdevice, getdtype
 import Ottergrad
 
 
@@ -16,9 +16,6 @@ def checktensor(operator):
         return operator(*arg_list)
 
     return check
-
-
-from Ottergrad.utils import checkgradisnone
 
 
 class Tensor:
@@ -105,17 +102,17 @@ class Tensor:
     @checktensor
     def __add__(self, other):
         def _forwardfunc(node):
-            node.setdata(np.add(node.getleft().getdata(), node.getright().getdata()))
+            node.setdata(np.add(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
 
         @checkgradisnone
         def _gradient(node):
             if node.getleft().shape() != node.getright().shape():
-                node.getleft().setgrad(node.getleft().getgrad() + np.sum(node.getgrad(), axis=0))
-                node.getright().setgrad(node.getright().getgrad() + np.sum(node.getgrad(), axis=0))
+                node.getleft().setgrad(node.getleft().getgrad() + np.sum(node.getgrad(), axis=0, dtype=getdtype()))
+                node.getright().setgrad(node.getright().getgrad() + np.sum(node.getgrad(), axis=0, dtype=getdtype()))
 
             else:
-                node.getleft().setgrad(node.getleft().getgrad() + node.getgrad())
-                node.getright().setgrad(node.getright().getgrad() + node.getgrad())
+                node.getleft().setgrad(np.add(node.getleft().getgrad(), node.getgrad(), dtype=getdtype()))
+                node.getright().setgrad(np.add(node.getright().getgrad(), node.getgrad(), dtype=getdtype()))
 
         tensor = Tensor()
         tensor.type = np.add
@@ -134,11 +131,11 @@ class Tensor:
         @checkgradisnone
         def _gradient(node):
             if node.getleft().getisconst():
-                node.getleft().setgrad(node.getleft().getgrad() + np.sum(node.getgrad(), axis=0))
+                node.getleft().setgrad(node.getleft().getgrad() + np.sum(node.getgrad(), axis=0, dtype=getdtype()))
             else:
                 node.getleft().setgrad(node.getleft().getgrad() + node.getgrad())
             if node.getright().getisconst():
-                node.getright().setgrad(np.sum(node.getright().getgrad() + node.getgrad(), axis=0))
+                node.getright().setgrad(node.getright().getgrad() + np.sum(node.getgrad(), axis=0, dtype=getdtype()))
             else:
                 node.getright().setgrad(node.getright().getgrad() + node.getgrad())
 
@@ -153,12 +150,12 @@ class Tensor:
     @checktensor
     def __sub__(self, other):
         def _forwardfunc(node):
-            node.setdata(np.subtract(node.getleft().getdata(), node.getright().getdata()))
+            node.setdata(np.subtract(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
 
         @checkgradisnone
         def _gradient(node):
-            node.getleft().setgrad(node.getleft().getgrad() + node.getgrad())
-            node.getright().setgrad(node.getright().getgrad() + -node.getgrad())
+            node.getleft().setgrad(np.add(node.getleft().getgrad(), node.getgrad(), dtype=getdtype()))
+            node.getright().setgrad(np.add(node.getright().getgrad(), -node.getgrad(), dtype=getdtype()))
 
         tensor = Tensor()
         tensor.type = ndarray.__sub__
@@ -171,12 +168,12 @@ class Tensor:
     @checktensor
     def __rsub__(self, other):
         def _forwardfunc(node):
-            node.setdata(np.subtract(node.getright().getdata(), node.getleft().getdata()))
+            node.setdata(np.subtract(node.getright().getdata(), node.getleft().getdata(), dtype=getdtype()))
 
         @checkgradisnone
         def _gradient(node):
-            node.getleft().setgrad(node.getleft().getgrad() + -node.getgrad())
-            node.getright().setgrad(node.getright().getgrad() + node.getgrad())
+            node.getleft().setgrad(np.add(node.getleft().getgrad(), -node.getgrad(), dtype=getdtype()))
+            node.getright().setgrad(np.add(node.getright().getgrad(), node.getgrad(), dtype=getdtype()))
 
         tensor = Tensor()
         tensor.type = ndarray.__rsub__
@@ -189,15 +186,19 @@ class Tensor:
     @checktensor
     def __mul__(self, other):
         def _forwardfunc(node):
-            node.setdata(np.multiply(node.getleft().getdata(), node.getright().getdata()))
+            node.setdata(np.multiply(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
 
         @checkgradisnone
         def _gradient(node):
             if node.getleft().getdata().shape == node.getright().getdata().shape:
-                node.getleft().setgrad(node.getleft().getgrad() + np.multiply(node.getright().getdata(), node.getgrad()))
+                node.getleft().setgrad(node.getleft().getgrad()
+                                       + np.multiply(node.getright().getdata(), node.getgrad(), dtype=getdtype()))
             else:
-                node.getleft().setgrad(node.getleft().getgrad() + np.sum(np.multiply(node.getright().getdata(), node.getgrad()), axis=0))
-            node.getright().setgrad(node.getright().getgrad() + np.multiply(node.getleft().getdata(), node.getgrad()))
+                node.getleft().setgrad(node.getleft().getgrad()
+                                       + np.sum(np.multiply(node.getright().getdata(),
+                                                            node.getgrad()), axis=0, dtype=getdtype()))
+            node.getright().setgrad(node.getright().getgrad() +
+                                    np.multiply(node.getleft().getdata(), node.getgrad(), dtype=getdtype()))
 
         tensor = Tensor()
         tensor.type = ndarray.__mul__
@@ -210,12 +211,14 @@ class Tensor:
     @checktensor
     def __rmul__(self, other):
         def _forwardfunc(node) -> None:
-            node.setdata(np.multiply(node.getleft().getdata(), node.getright().getdata()))
+            node.setdata(np.multiply(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
 
         @checkgradisnone
         def _gradient(node) -> None:
-            node.getleft().setgrad(node.getleft().getgrad() + np.multiply(node.getright().getdata(), node.getgrad()))
-            node.getright().setgrad(node.getright().getgrad() + np.multiply(node.getleft().getdata(), node.getgrad()))
+            node.getleft().setgrad(node.getleft().getgrad()
+                                   + np.multiply(node.getright().getdata(), node.getgrad(), dtype=getdtype()))
+            node.getright().setgrad(node.getright().getgrad()
+                                    + np.multiply(node.getleft().getdata(), node.getgrad(), dtype=getdtype()))
 
         tensor = Tensor()
         tensor.type = ndarray.__rmul__
@@ -228,14 +231,16 @@ class Tensor:
     @checktensor
     def __truediv__(self, other):
         def _forwardfunc(node) -> None:
-            node.setdata(np.divide(node.getleft().getdata(), node.getright().getdata()))
+            node.setdata(np.divide(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
 
         @checkgradisnone
         def _gradient(node: Tensor) -> None:
-            node.getleft().setgrad(node.getleft().getgrad() +
-                                   np.multiply(np.divide(1, node.getright().getdata()), node.getgrad()))
+            node.getleft().setgrad(
+                node.getleft().getgrad() +
+                np.multiply(np.divide(1, node.getright().getdata()), node.getgrad(), dtype=getdtype()))
             node.getright().setgrad(
-                node.getright().getgrad() + np.multiply(node.getleft().getdata(), -node.getright().getdata() ** -2))
+                node.getright().getgrad()
+                + np.multiply(node.getleft().getdata(), -node.getright().getdata() ** -2, dtype=getdtype()))
 
         tensor = Tensor()
         tensor.type = ndarray.__truediv__
@@ -248,14 +253,16 @@ class Tensor:
     @checktensor
     def __rtruediv__(self, other):
         def _forwardfunc(node) -> None:
-            node.setdata(np.divide(node.getright().getdata(), node.getleft().getdata()))
+            node.setdata(np.divide(node.getright().getdata(), node.getleft().getdata(), dtype=getdtype()))
 
         @checkgradisnone
         def _gradient(node) -> None:
             node.getleft().setgrad(
-                node.getleft().getgrad() + np.dot(node.getleft().getdata(), -node.getright().getdata() ** -2))
+                node.getleft().getgrad()
+                + np.dot(node.getleft().getdata(), -node.getright().getdata() ** -2))
             node.getright().setgrad(
-                node.getright().getgrad() + np.dot(np.divide(1, node.getright().getdata()), node.getgrad()))
+                node.getright().getgrad()
+                + np.dot(np.divide(1, node.getright().getdata()), node.getgrad()))
 
         tensor = Tensor()
         tensor.type = ndarray.__rtruediv__
@@ -268,15 +275,17 @@ class Tensor:
     @checktensor
     def __pow__(self, power, modulo=None):
         def _forward(node) -> None:
-            node.setdata(np.power(node.getleft().getdata(), node.getright().getdata()))
+            node.setdata(np.power(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
 
         @checkgradisnone
         def _gradient(node) -> None:
             epsilon = getepsilon()
-            node.getleft().setgrad(node.getleft().getgrad() +
-                                   np.multiply(node.getgrad(), np.multiply(node.getright().getdata(),
-                                                                   node.getleft().getdata() ** (
-                                                                           node.getright().getdata() - 1))))
+            node.getleft().setgrad(
+                node.getleft().getgrad() +
+                np.multiply(node.getgrad(),
+                            np.multiply(node.getright().
+                                        getdata(),
+                                        node.getleft().getdata() ** (node.getright().getdata() - 1), dtype=getdtype())))
 
             node.getleft().data = np.where(np.abs(node.getleft().getdata()) > epsilon, node.getleft().getdata(),
                                            np.sign(node.getleft().getdata()) * epsilon)
@@ -284,8 +293,11 @@ class Tensor:
             node.getleft().data = np.where(node.getleft().getdata() == 0., epsilon, node.getleft().getdata())
 
             node.getright().setgrad(node.getright().getgrad() +
-                                    np.multiply(node.getgrad(), np.multiply(node.getleft().getdata(),
-                                                                            np.log(node.getleft().getdata()))))
+                                    np.multiply(node.getgrad(),
+                                                np.multiply(node.getleft().getdata(),
+                                                            np.log(node.getleft().getdata(),
+                                                                   dtype=getdtype()), dtype=getdtype()),
+                                                dtype=getdtype()))
 
         tensor = Tensor()
         tensor.type = ndarray.__pow__
@@ -303,12 +315,15 @@ class Tensor:
         @checkgradisnone
         def _gradient(node) -> None:
             node.getleft().setgrad(node.getleft().getgrad() +
-                                   np.dot(node.getgrad()).T, np.dot(node.getgrad(), np.log(node.getleft().getdata())))
+                                   np.dot(node.getgrad().T,
+                                          np.dot(node.getgrad(),
+                                                 np.log(node.getleft().getdata()), dtype=getdtype()), dtype=getdtype()))
 
             node.getright().setgrad(node.getright().getgrad() +
                                     np.dot(node.getgrad().T, np.dot(node.getright().getdata(),
                                                                     node.getleft().getdata() ** (
-                                                                            node.getright().getdata() - 1))))
+                                                                            node.getright().getdata() - 1),
+                                                                    dtype=getdtype()), dtype=getdtype()))
 
         tensor = Tensor()
         tensor.setleft(self)
@@ -341,7 +356,7 @@ class Tensor:
     @checktensor
     def __gt__(self, other):
         def _forward(node) -> None:
-            node.setdata(np.greater(node.getleft().getdata(), node.getright().getdata()))
+            node.setdata(np.greater(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
 
         def _gradient(*args) -> None:
             pass
@@ -357,7 +372,7 @@ class Tensor:
     @checktensor
     def __lt__(self, other):
         def _forward(node) -> None:
-            node.setdata(np.less(node.getleft().getdata(), node.getright().getdata()))
+            node.setdata(np.less(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
 
         def _gradient(*args) -> None:
             pass
@@ -544,7 +559,6 @@ class Graph:
                 func(node)
             else:
                 pass
-
             return
 
         through(self.getroot())

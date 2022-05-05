@@ -6,5 +6,6 @@ requires = [
     "numpy>=1.18.5",
     "setuptools>=42",
     "wheel",
+    "numba",
 #    "Ottergrad"
 ]

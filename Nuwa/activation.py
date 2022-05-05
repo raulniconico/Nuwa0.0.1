@@ -1,5 +1,6 @@
 from Ottergrad.autograd import Func, checktensor
 import Ottergrad.otternumpy as on
+from Ottergrad.utils import getdtype
 
 
 class _Sigmoid(Func):
@@ -10,7 +11,7 @@ class _Sigmoid(Func):
         """
         Sigmoid function
         """
-        tensor = 1.0 / (1.0 + on.exp(-x))
+        tensor = getdtype()(1) / (getdtype()(1) + on.exp(-x))
         self.setroot(tensor)
         return tensor
 

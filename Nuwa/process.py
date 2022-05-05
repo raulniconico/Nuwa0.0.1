@@ -4,7 +4,7 @@ import time
 from Nuwa.dataloader import Dataset
 from Nuwa.network import NN
 from Nuwa.optimizers import *
-from Nuwa.utils import plotloss
+from Nuwa.utils import plotloss, getdtype
 from Ottergrad.autograd import Tensor, Func
 from Nuwa.optimizers import SGD, Adam, _Optim, lrdecay
 

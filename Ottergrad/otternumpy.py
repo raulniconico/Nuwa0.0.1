@@ -4,7 +4,12 @@ import numpy as np
 
 from Ottergrad.utils import getdtype
 from Ottergrad.autograd import Tensor, Func, checktensor
-from Ottergrad.utils import checkgradisnone
+from Ottergrad.utils import *
+
+
+def ndot(a, b):
+    res = np.dot(a, b)
+    return res
 
 
 class _dot(Func):
@@ -24,22 +29,22 @@ class _dot(Func):
 
     @staticmethod
     def _forwardfunc(node: Tensor):
-        res = np.dot(node.getleft().getdata(), node.getright().getdata())
+
+        res = ndot(node.getleft().getdata(), node.getright().getdata())
         node.setdata(res)
-        return res
 
     @checkgradisnone
     def gradient(self):
-
-        self.root.getleft().setgrad(self.root.getgrad() + np.dot(self.root.getgrad(), self.root.getright().getdata().T))
-        self.root.getright().setgrad(self.root.getgrad() + np.dot(self.root.getleft().getdata().T, self.root.getgrad()))
-
+        grad_l = ndot(self.root.getgrad(), self.root.getright().getdata().T)
+        grad_r = ndot(self.root.getleft().getdata().T, self.root.getgrad())
+        self.root.getleft().setgrad(self.root.getgrad() + grad_l)
+        self.root.getright().setgrad(self.root.getgrad() + grad_r)
 
     @staticmethod
     @checkgradisnone
     def _gradient(node):
-        node.getleft().setgrad(node.getleft().getgrad() + np.dot(node.getgrad(), node.getright().getdata().T))
-        node.getright().setgrad(node.getright().getgrad() + np.dot(node.getleft().getdata().T, node.getgrad()))
+        node.getleft().setgrad(node.getleft().getgrad() + ndot(node.getgrad(), node.getright().getdata().T))
+        node.getright().setgrad(node.getright().getgrad() + ndot(node.getleft().getdata().T, node.getgrad()))
 
 
 @checktensor
@@ -65,7 +70,7 @@ class _abs(Func):
 
     @staticmethod
     def _forwardfunc(node):
-        node.setdata(np.abs(node.getleft().getdata()))
+        node.setdata(np.abs(node.getleft().getdata(), dtype=getdtype()))
 
     @staticmethod
     @checkgradisnone
@@ -73,6 +78,11 @@ class _abs(Func):
         condlist = [node.getleft().getdata() < 0, node.getleft().getdata() > 0]
         choicelist = [-1, 1]
         node.getleft().setgrad(node.getleft().getgrad() + np.select(condlist, choicelist))
+
+
+def nabs(x):
+    res = np.abs(x)
+    return res
 
 
 @checktensor
@@ -102,16 +112,21 @@ class _sum(Func):
 
     @staticmethod
     def _forwardfunc(node: Tensor):
-        node.setdata(np.sum(node.getleft().getdata(), **node.getkwargs()))
+        node.setdata(nsum(node.getleft().getdata(), **node.getkwargs()))
 
     def gradient(self):
-        self.root.getleft().setgrad(self.root.getleft().getgrad() + np.sum(self.root.getgrad(), *self.root.getargs()))
+        self.root.getleft().setgrad(self.root.getleft().getgrad() + nsum(self.root.getgrad(), *self.root.getargs()))
 
     @staticmethod
     @checkgradisnone
     def _gradient(node: Tensor):
         node.getleft().setgrad(node.getleft().getgrad()
                                + node.getgrad() * np.ones(node.getleft().getdata().shape))
+
+
+def nsum(x, axis):
+    res = np.sum(x, axis)
+    return res
 
 
 def sum(x: Tensor, axis: int = None):
@@ -133,7 +148,7 @@ class _concatenate(Func):
         if isalldata:
             result = sets[0]
             for set in sets:
-                np.concatenate((result, set), axis)
+                nconcatenate((result, set), axis)
             return result
 
         else:
@@ -151,12 +166,17 @@ class _concatenate(Func):
 
     @staticmethod
     def _forwardfunc(node: Tensor):
-        node.setdata(np.concatenate((node.getleft().getdata(), node.getright().getdata()), **node.getkwargs()))
+        node.setdata(nconcatenate((node.getleft().getdata(), node.getright().getdata()), **node.getkwargs()))
 
     @staticmethod
     @checkgradisnone
     def _gradient(node: Tensor):
         pass
+
+
+# @pyjit
+def nconcatenate(x, y, **kwargs):
+    return np.concatenate(x, y, **kwargs)
 
 
 def concatenate(sets: tuple, axis=0):
@@ -184,12 +204,17 @@ class _split(Func):
 
     @staticmethod
     def _forwardfunc(node: Tensor):
-        node.setdata(np.split(node.getleft().getdata(), **node.getkwargs()))
+        node.setdata(nsplit(node.getleft().getdata(), **node.getkwargs()))
 
     @staticmethod
     @checkgradisnone
     def _gradient(node: Tensor):
         pass
+
+
+# @pyjit
+def nsplit(x, indices, axis=0):
+    return np.split(x, indices, axis=axis)
 
 
 def split(x, indices, axis=0):
@@ -207,7 +232,7 @@ class _ones(Func):
         tensor = Tensor()
         tensor.type = np.ones
         tensor.isgrad = False
-        tensor.setargs({"shape" : shape, "dtype" :dtype})
+        tensor.setargs({"shape": shape, "dtype": dtype})
         tensor.setforwardfunc(self._forwardfunc)
         tensor.setgradfunc(self._gradient)
         self.root = tensor
@@ -259,6 +284,7 @@ class _shape(Func):
     def _gradient(*args):
         pass
 
+
 @checktensor
 def shape(x):
     func = _shape()
@@ -291,7 +317,7 @@ class _take(Func):
 
     @staticmethod
     def _forwardfunc(node):
-        node.setdata(np.take(node.getleft().getdata(), **node.getkwargs()))
+        node.setdata(ntake(node.getleft().getdata(), **node.getkwargs()))
 
     def gradient(self):
         pass
@@ -299,6 +325,11 @@ class _take(Func):
     @staticmethod
     def _gradient(*args):
         pass
+
+
+# @pyjit
+def ntake(x, indices=None, axis=0):
+    return np.take(x, indices=indices, axis=axis)
 
 
 def take(x: Tensor, choosen, axis=0):
@@ -323,9 +354,9 @@ class _exp(Func):
     @staticmethod
     def _forwardfunc(node):
         if node.getkwargs() != []:
-            node.setdata(np.exp(node.getleft().getdata(), **node.getkwargs()))
+            node.setdata(nexp(node.getleft().getdata(), **node.getkwargs()))
         else:
-            node.setdata(np.exp(node.getleft().getdata()))
+            node.setdata(nexp(node.getleft().getdata()))
 
     def gradient(self):
         self.root.getleft().setgrad(self.root.getleft().getgrad() + self.root.getgrad())
@@ -333,7 +364,10 @@ class _exp(Func):
     @staticmethod
     @checkgradisnone
     def _gradient(node):
-        node.getleft().setgrad(node.getleft().getgrad() + (node.getgrad() * np.exp(node.getleft().getdata())))
+        node.getleft().setgrad(node.getleft().getgrad() + (node.getgrad() * nexp(node.getleft().getdata())))
+
+def nexp(x):
+    return np.exp(x)
 
 
 def exp(x, **kwargs):
@@ -359,24 +393,34 @@ class _maximum(Func):
     @staticmethod
     def _forwardfunc(node):
         if node.getkwargs() != []:
-            node.setdata(np.maximum(node.getleft().getdata(), node.getright().getdata(), **node.getkwargs()))
+            node.setdata(nmaximum(node.getleft().getdata(), node.getright().getdata(), **node.getkwargs()))
         else:
-            node.setdata(np.maximum(node.getleft().getdata(), node.getright().getdata()))
+            node.setdata(nmaximum(node.getleft().getdata(), node.getright().getdata()))
 
     def gradient(self):
         #     grad = copy.deepcopy(node.getgrad())
         #     grad[grad <= 0] = 0
         #     node.getleft().grad = grad
-        self.root.getleft().setgrad(np.minimum(self.root.getleft().getdata(), self.root.getright().getdata()))
-        self.root.getright().setgrad(np.minimum(self.root.getright().getdata(), self.root.getleft().getdata()))
+        self.root.getleft().setgrad(nminimum(self.root.getleft().getdata(), self.root.getright().getdata()))
+        self.root.getright().setgrad(nminimum(self.root.getright().getdata(), self.root.getleft().getdata()))
 
     @staticmethod
     @checkgradisnone
     def _gradient(node):
         node.getleft().setgrad(
-            node.getleft().getgrad() + np.minimum(node.getleft().getdata(), node.getright().getdata()))
+            node.getleft().getgrad() + nminimum(node.getleft().getdata(), node.getright().getdata()))
         node.getright().setgrad(
-            node.getright().getgrad() + np.minimum(node.getright().getdata(), node.getleft().getdata()))
+            node.getright().getgrad() + nminimum(node.getright().getdata(), node.getleft().getdata()))
+
+
+# @pyjit
+def nmaximum(x, y):
+    return np.maximum(x, y)
+
+
+# @pyjit
+def nminimum(x, y):
+    return np.minimum(x, y)
 
 
 def maximum(x: [Tensor, int, float, np.ndarray], y: [Tensor, int, float, np.ndarray], **kwargs):
@@ -410,15 +454,19 @@ class _tanh(Func):
     def gradient(self):
         self.getroot().getleft().setgrad(self.getroot().getleft().getgrad() +
                                          np.multiply((np.ones(self.getroot().getgrad().shape) -
-                                                      np.tanh(self.getroot().getgrad()) ** 2),
+                                                      ntanh(self.getroot().getgrad()) ** 2),
                                                      self.getroot().getgrad()))
 
     @staticmethod
     @checkgradisnone
     def _gradient(node):
         node.getleft().setgrad(node.getleft().getgrad() +
-                               np.multiply((np.ones(node.getgrad().shape) - np.tanh(node.getgrad()) ** 2),
+                               np.multiply((np.ones(node.getgrad().shape) - ntanh(node.getgrad()) ** 2),
                                            node.getgrad()))
+
+
+def ntanh(x):
+    return np.tanh(x)
 
 
 @checktensor
@@ -445,12 +493,16 @@ class _sin(Func):
 
     def gradient(self):
         self.getroot().getleft().setgrad(self.getroot().getleft().getgrad() +
-            np.multiply(self.root.getgrad(), np.cos(self.root.getleft().getdata())))
+                                         np.multiply(self.root.getgrad(), np.cos(self.root.getleft().getdata())))
 
     @staticmethod
     @checkgradisnone
     def _gradient(node):
         node.getleft().setgrad(node.getleft().getgrad() + np.multiply(node.getgrad(), np.cos(node.getleft().getdata())))
+
+
+def nsin(x):
+    return np.sin(x)
 
 
 @checktensor
@@ -486,6 +538,10 @@ class _cos(Func):
                                np.multiply(node.getgrad(), -np.sin(node.getleft().getdata())))
 
 
+def ncos(x):
+    return np.cos(x)
+
+
 @checktensor
 def cos(x):
     func = _cos()
@@ -511,13 +567,17 @@ class _tan(Func):
     def gradient(self):
         self.getroot().getleft().setgrad(self.getroot().getleft().getgrad() +
                                          np.multiply(self.root.getgrad(), 1 -
-                                                     np.tanh(self.root.getleft().getdata())**2))
+                                                     np.tanh(self.root.getleft().getdata()) ** 2))
 
     @staticmethod
     @checkgradisnone
     def _gradient(node):
         node.getleft().setgrad(node.getleft().getgrad() +
-                               np.multiply(node.getgrad(), 1 - np.tanh(node.getleft().getdata())**2))
+                               np.multiply(node.getgrad(), 1 - np.tanh(node.getleft().getdata()) ** 2))
+
+
+def ntan(x):
+    return np.tan(x)
 
 
 @checktensor
@@ -566,6 +626,10 @@ class _where(Func):
                                         x.getinput().getgrad(), y.getinput().getgrad()))
 
 
+def nwhere(contition, x, y):
+    return np.where(contition, x, y)
+
+
 @checktensor
 def where(contition, x, y):
     func = _where()
@@ -593,7 +657,11 @@ class _mean(Func):
     @checkgradisnone
     def _gradient(node):
         shape = np.shape(node.getleft().getdata())
-        node.getleft().setgrad(node.getleft().getgrad() + 1/shape[0] * np.ones(shape) * node.getgrad())
+        node.getleft().setgrad(node.getleft().getgrad() + 1 / shape[0] * np.ones(shape) * node.getgrad())
+
+
+def nmean(x, axis=0):
+    return np.mean(x, axis=axis)
 
 
 def mean(x: Tensor, axis=0):
@@ -606,7 +674,7 @@ class _var(Func):
         super().__init__()
 
     def __call__(self, x: Tensor = None, axis=0):
-        tensor = 1/shape(x)[0] * (x - mean(x, axis)) ** 2
+        tensor = 1 / shape(x)[0] * (x - mean(x, axis)) ** 2
         return tensor
 
 
@@ -633,16 +701,13 @@ class _sqrt(Func):
     def _forwardfunc(node):
         node.setdata(np.sqrt(node.getleft().getdata()))
 
-
     @staticmethod
     @checkgradisnone
     def _gradient(node):
-
-        node.getleft().setgrad(node.getleft().getgrad() + 1/2 * node.getleft().getdata() ** (-1/2))
+        node.getleft().setgrad(node.getleft().getgrad() + 1 / 2 * node.getleft().getdata() ** (-1 / 2))
 
 
 @checktensor
 def sqrt(x):
     func = _sqrt()
     return func(x)
-

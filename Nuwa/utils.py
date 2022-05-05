@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-dtype = np.float16
+dtype = np.float32
 epsilon = 1e-8
+devise = 'cuda'
 
 
 def getdtype():
@@ -11,6 +12,10 @@ def getdtype():
 
 def getepsilon():
     return epsilon
+
+
+def getdevice():
+    return devise
 
 
 def plotloss(loss_list):

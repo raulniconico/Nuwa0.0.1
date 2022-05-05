@@ -3,6 +3,7 @@ import numpy as np
 import Nuwa
 from Ottergrad.autograd import Tensor
 import Ottergrad.otternumpy as on
+from Ottergrad.utils import getdtype
 
 
 class Dataset:
@@ -118,11 +119,11 @@ class Dataset:
 
     def getftr(self) -> Tensor:
         assert self.ftr is not None, "Dataset has no feature data"
-        return Tensor(self.ftr)
+        return Tensor(getdtype()(self.ftr))
 
     def getlabel(self) -> Tensor:
         assert self.label is not None, "Dataset has no label data"
-        return Tensor(self.label)
+        return Tensor(getdtype()(self.label))
 
     def getminibatch(self):
         return self.mini_batch

@@ -179,7 +179,7 @@ class Linear(Layer):
         return self.passer_list[-1]
 
     def init_weight(self):
-        weight = Tensor(np.random.uniform(-1, 1, (self.input_dim, self.output_dim)))
+        weight = Tensor(getdtype()(np.random.uniform(-1, 1, (self.input_dim, self.output_dim))))
         weight.type = "linear weight"
         self.weights = {"W": weight}
         if self.BN is True:
