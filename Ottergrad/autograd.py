@@ -1,12 +1,39 @@
-import numpy as np
-from numpy import ndarray
 from inspect import signature
-from Ottergrad.utils import getepsilon, checkgradisnone, getdevice, getdtype
+
+import numpy as np
+import skcuda.misc
+from numpy import ndarray
+
 import Ottergrad
+import shell.shell
+from Ottergrad.utils import checkgradisnone
+
+from shell.utils import getcudadevice, checkDataDevice
+
+import pycuda.gpuarray as gpuarray
+from utils.utils import getepsilon, getdtype, getdevice, getsupportdevice
+
+from skcuda import cublas
+import skcuda.linalg as linalg
+skcuda.linalg.init()
+
+# set device the same as Nuwa
+device = getdevice()
+DEVICE = getsupportdevice()
+dtype = getdtype()
+if dtype == "float32":
+    np_dtype = np.float32
+    cuda_dtype = "single"
+elif dtype == "float64":
+    np_dtype = np.float64
+    cuda_dtype = "double"
+elif dtype == "float16":
+    np.dtype = np.float16
+    cuda_dtype = "half"
 
 
-def checktensor(operator):
-    def check(*args, **kwargs):
+def checkTensor(operator):
+    def check(*args):
         arg_list = []
         for arg in args:
             if type(arg) is not Tensor:
@@ -58,13 +85,16 @@ class Tensor:
         "__rmatmul__"
     }
 
-    def __init__(self, data=None, isgrad=True, *args, **kwargs):
+    def __init__(self, data=None, isgrad=True, dtype=np_dtype, device="cpu", *args, **kwargs):
+        assert device in DEVICE, "device must in Tensor.DEVICE"
         self.data = None
+        self.dtype = dtype
+        self.device = device
         self.grad = None
         self.momentum = None
         self.left = None
         self.right = None
-        self.type = "weight"
+        self.type = None
         self.momentum = None
         self.isgrad = isgrad
         self.isconst = False
@@ -73,6 +103,7 @@ class Tensor:
         self.gradfunc = None
         self.forwardfunc = None
 
+        self.setdevice(device)
         self.setargs(list(args))
         self.setkwargs(list(kwargs))
         self.setdata(data)
@@ -81,7 +112,7 @@ class Tensor:
         forwardfunc = self.forwardfunc
         index = item
 
-        def _forwardfunc(node):
+        def _forwardfunc(node: Tensor):
             forwardfunc(node)
             node.setdata(node.getdata()[index])
 
@@ -94,15 +125,22 @@ class Tensor:
             tensor = Tensor()
         tensor.left = self
         tensor.type = self.type
+        tensor.dtype = self.dtype
+        tensor.device = self.device
         tensor.isgrad = False
         tensor.forwardfunc = _forwardfunc
         tensor.gradfunc = _gradient
         return tensor
 
-    @checktensor
+    @checkTensor
     def __add__(self, other):
-        def _forwardfunc(node):
+
+        def _forwardfunc(node: Tensor):
             node.setdata(np.add(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
+
+        @checkDataDevice
+        def _forwardfunc_cuda(node: Tensor):
+            node.setdata(node.getleft().getdata() + node.getright().getdata())
 
         @checkgradisnone
         def _gradient(node):
@@ -114,17 +152,33 @@ class Tensor:
                 node.getleft().setgrad(np.add(node.getleft().getgrad(), node.getgrad(), dtype=getdtype()))
                 node.getright().setgrad(np.add(node.getright().getgrad(), node.getgrad(), dtype=getdtype()))
 
+        @checkgradisnone
+        def _gradient_cuda(node):
+            if node.getleft().shape() != node.getright().shape():
+                node.getleft().setgrad(node.getleft().getgrad() + skcuda.misc.sum(node.getgrad(), axis=0))
+                node.getright().setgrad(node.getright().getgrad() + skcuda.misc.sum(node.getgrad(), axis=0))
+
+            else:
+                node.getleft().setgrad(node.getleft().getgrad() + node.getgrad())
+                node.getright().setgrad(node.getright().getgrad() + node.getgrad())
+
         tensor = Tensor()
-        tensor.type = np.add
+        tensor.type = "add"
         tensor.setleft(self)
         tensor.setright(other)
-        tensor.setgradfunc(_gradient)
-        tensor.setforwardfunc(_forwardfunc)
+        tensor.setdevice(self.device)
 
+        if self.device == "gpu" or self.device == "cuda":
+            tensor.setforwardfunc(_forwardfunc_cuda)
+            tensor.setgradfunc(_gradient_cuda)
+        else:
+            tensor.setforwardfunc(_forwardfunc)
+            tensor.setgradfunc(_gradient)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __radd__(self, other):
+        @checkDataDevice
         def _forwardfunc(node):
             node.setdata(np.add(node.getleft().getdata(), node.getright().getdata()))
 
@@ -147,7 +201,7 @@ class Tensor:
         tensor.setforwardfunc(_forwardfunc)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __sub__(self, other):
         def _forwardfunc(node):
             node.setdata(np.subtract(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
@@ -165,7 +219,7 @@ class Tensor:
         tensor.setforwardfunc(_forwardfunc)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __rsub__(self, other):
         def _forwardfunc(node):
             node.setdata(np.subtract(node.getright().getdata(), node.getleft().getdata(), dtype=getdtype()))
@@ -183,32 +237,51 @@ class Tensor:
         tensor.setforwardfunc(_forwardfunc)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __mul__(self, other):
+        @checkDataDevice
         def _forwardfunc(node):
-            node.setdata(np.multiply(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
+            if node.getdevice() in ["cpu"]:
+                node.setdata(np.multiply(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
+            elif node.getdevice() in ["gpu", "cuda"]:
+                node.setdata(skcuda.misc.multiply(node.getleft().getdata(), node.getright().getdata()))
+            else:
+                raise Exception
 
         @checkgradisnone
         def _gradient(node):
-            if node.getleft().getdata().shape == node.getright().getdata().shape:
-                node.getleft().setgrad(node.getleft().getgrad()
-                                       + np.multiply(node.getright().getdata(), node.getgrad(), dtype=getdtype()))
-            else:
-                node.getleft().setgrad(node.getleft().getgrad()
-                                       + np.sum(np.multiply(node.getright().getdata(),
-                                                            node.getgrad()), axis=0, dtype=getdtype()))
-            node.getright().setgrad(node.getright().getgrad() +
-                                    np.multiply(node.getleft().getdata(), node.getgrad(), dtype=getdtype()))
+            if node.getdevice() in ["cpu"]:
+                if node.getleft().getdata().shape == node.getright().getdata().shape:
+                    node.getleft().setgrad(node.getleft().getgrad()
+                                           + np.multiply(node.getright().getdata(), node.getgrad(), dtype=getdtype()))
+                else:
+                    node.getleft().setgrad(node.getleft().getgrad()
+                                           + np.sum(np.multiply(node.getright().getdata(),
+                                                                node.getgrad()), axis=0, dtype=getdtype()))
+                node.getright().setgrad(node.getright().getgrad() +
+                                        np.multiply(node.getleft().getdata(), node.getgrad(), dtype=getdtype()))
+
+            elif node.getdevice() in ["gpu", "cuda"]:
+                if node.getleft().getdata().shape == node.getright().getdata().shape:
+                    node.getleft().setgrad(node.getleft().getgrad()
+                                           + skcuda.misc.multiply(node.getright().getdata(), node.getgrad()))
+                else:
+                    node.getleft().setgrad(node.getleft().getgrad()
+                                           + skcuda.misc.sum(skcuda.misc.multiply(node.getright().getdata(),
+                                                                                  node.getgrad()), axis=0))
+                node.getright().setgrad(node.getright().getgrad() +
+                                        skcuda.misc.multiply(node.getleft().getdata(), node.getgrad()))
 
         tensor = Tensor()
         tensor.type = ndarray.__mul__
         tensor.setleft(self)
+        tensor.device = self.device
         tensor.setright(other)
         tensor.setgradfunc(_gradient)
         tensor.setforwardfunc(_forwardfunc)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __rmul__(self, other):
         def _forwardfunc(node) -> None:
             node.setdata(np.multiply(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
@@ -228,7 +301,7 @@ class Tensor:
         tensor.setforwardfunc(_forwardfunc)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __truediv__(self, other):
         def _forwardfunc(node) -> None:
             node.setdata(np.divide(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
@@ -250,7 +323,7 @@ class Tensor:
         tensor.setgradfunc(_gradient)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __rtruediv__(self, other):
         def _forwardfunc(node) -> None:
             node.setdata(np.divide(node.getright().getdata(), node.getleft().getdata(), dtype=getdtype()))
@@ -272,7 +345,7 @@ class Tensor:
         tensor.setforwardfunc(_forwardfunc)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __pow__(self, power, modulo=None):
         def _forward(node) -> None:
             node.setdata(np.power(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
@@ -307,7 +380,7 @@ class Tensor:
         tensor.setgradfunc(_gradient)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __rpow__(self, other):
         def _forward(node) -> None:
             node.setdata(np.power(node.getright().getdata(), node.getleft().getdata()))
@@ -333,8 +406,9 @@ class Tensor:
         tensor.setgradfunc(_gradient)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __neg__(self):
+        @checkDataDevice
         def _forward(node) -> None:
             node.setdata(-node.getleft().getdata())
 
@@ -349,11 +423,49 @@ class Tensor:
         tensor.setgradfunc(_gradient)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __matmul__(self, other):
-        return Ottergrad.otternumpy.dot(self, other)
+        @checkDataDevice
+        def _forward(node: Tensor):
+            if node.getdevice() in ["cpu"]:
+                node.setdata(np.dot(node.getleft().getdata(), node.getright().getdata()).astype(node.dtype))
 
-    @checktensor
+            elif node.getdevice() in ["gpu", "cuda"]:
+                node.setdata(linalg.dot(node.getleft().getdata(), node.getright().getdata()).astype(node.dtype))
+
+        @checkgradisnone
+        def _gradient(node):
+            if node.getdevice() in ["cpu"]:
+
+                node.getleft().setgrad(node.getleft().getgrad() + np.dot(node.getgrad(), node.getright().getdata().T))
+                node.getright().setgrad(node.getright().getgrad() + np.dot(node.getleft().getdata().T, node.getgrad()))
+
+            elif node.getdevice() in ["gpu", "cuda"]:
+
+                res_left = skcuda.linalg.dot(node.getgrad(), node.getright().getdata())
+                if res_left.shape == ():
+                    res_left = gpuarray.ones_like(node.getleft().getgrad()).fill(res_left.get())
+                node.getleft().setgrad(node.getleft().getgrad() + res_left)
+
+                trans = skcuda.linalg.transpose(node.getleft().getdata())
+                res_right = skcuda.linalg.dot(trans, node.getgrad())
+                if res_right.shape == ():
+                    res_right = gpuarray.ones_like(node.getright().getgrad()).fill(res_right.get())
+                node.getright().setgrad(node.getright().getgrad() + res_right)
+
+            else:
+                raise Exception
+
+        tensor = Tensor()
+        tensor.type = "dot"
+        tensor.setleft(self)
+        tensor.setright(other)
+        tensor.device = self.device
+        tensor.setforwardfunc(_forward)
+        tensor.setgradfunc(_gradient)
+        return tensor
+
+    @checkTensor
     def __gt__(self, other):
         def _forward(node) -> None:
             node.setdata(np.greater(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
@@ -369,7 +481,7 @@ class Tensor:
         tensor.setgradfunc(_gradient)
         return tensor
 
-    @checktensor
+    @checkTensor
     def __lt__(self, other):
         def _forward(node) -> None:
             node.setdata(np.less(node.getleft().getdata(), node.getright().getdata(), dtype=getdtype()))
@@ -389,7 +501,38 @@ class Tensor:
         return self.data
 
     def setdata(self, data):
-        self.data = data
+        if data is not None:
+            if self.device in ["gpu", "cuda"]:
+                if type(data) == gpuarray.GPUArray:
+                    self.data = data.astype(self.dtype)
+                elif type(data) == np.ndarray:
+                    self.data = data.astype(self.dtype)
+                    self.data = gpuarray.to_gpu(self.data)
+                else:
+                    self.data = np.array(data, dtype=self.dtype)
+                    self.data = gpuarray.to_gpu(self.data)
+            elif self.device in ["cpu"]:
+                if type(data) == gpuarray.GPUArray:
+                    self.data = data.get().astype(self.dtype)
+                elif type(data) == np.ndarray:
+                    self.data = data.astype(self.dtype)
+                else:
+                    self.data = np.array(data, dtype=self.dtype)
+            else:
+                raise Exception
+
+    def setdevice(self, device):
+        self.device = device
+
+
+    def getdtype(self):
+        return self.dtype
+
+    def setdtype(self, dtype: np.dtype):
+        self.dtype = dtype
+
+    def getdevice(self):
+        return self.device
 
     def getgrad(self):
         return self.grad
@@ -485,6 +628,12 @@ class Tensor:
     def T(self):
         return np.transpose(self.data)
 
+    def toDevice(self):
+        assert self.data is not None, "Tensor's data is None, add data first"
+        assert self.device != "cpu", "Tensor's device must not be cpu"
+        self.device = "gpu"
+        self.data = gpuarray.to_gpu(self.data)
+
 
 class Graph:
     def __init__(self, root=None, *args, **kwargs):
@@ -508,8 +657,7 @@ class Graph:
 
     def backpropagation(self) -> Tensor:
 
-        def backward(node):
-            epsilon = Ottergrad.utils.getepsilon()
+        def backward(node: Tensor):
             if node.getleft() is not None and node.getgradfunc() is not None:
                 gradfunc = node.getgradfunc()
                 gradfunc(node)
@@ -521,7 +669,10 @@ class Graph:
                 return
 
         if self.getroot().getgrad() is None:
-            self.getroot().setgrad(np.ones(np.shape(self.getroot().getdata())))
+            if self.getroot().getdevice() in ["cuda", "gpu"]:
+                self.getroot().setgrad(gpuarray.ones_like(self.getroot().getdata(),dtype=self.getroot().dtype))
+            elif self.getroot().getdevice() in ["cpu"]:
+                self.getroot().setgrad(np.ones(self.getroot().getdata().shape, dtype=self.getroot().dtype))
 
         backward(self.getroot())
         return self.root
@@ -638,4 +789,3 @@ class Func:
         assert self.root is not None, "no root been set"
         self.setroot(self.root)
         return self.graph
-

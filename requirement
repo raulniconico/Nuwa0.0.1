@@ -3,4 +3,5 @@
 matplotlib>=3.2.2
 numpy>=1.18.5
 scipy>=1.4.1
-numba
+pycuda>=2021.1
+scikit-cuda>=0.5.3

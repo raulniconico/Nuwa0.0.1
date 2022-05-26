@@ -147,9 +147,19 @@ class Linear(Layer):
 
     As same as Layer except no need to clarify type
     """
+    INITIALIZATION = {
+        "uniform",
+        "normalized",
+        "xavier",
+        "he"
 
-    def __init__(self, input_dim=None, output_dim=None, activation="none", BN: bool = False, pretrained=None):
+    }
+
+    def __init__(self, input_dim=None, output_dim=None, activation="none", BN: bool = False, pretrained=None,
+                 weight_initialization_method="xavier"):
         super().__init__("Linear", input_dim, output_dim, activation, BN, pretrained)
+        assert weight_initialization_method in self.INITIALIZATION, "invalid initialization method for linear weight"
+        self.weight_initialization_method = weight_initialization_method
 
     def __call__(self, x: [Tensor, Func]):
         # init weight
@@ -179,7 +189,22 @@ class Linear(Layer):
         return self.passer_list[-1]
 
     def init_weight(self):
-        weight = Tensor(getdtype()(np.random.uniform(-1, 1, (self.input_dim, self.output_dim))))
+        if self.weight_initialization_method == "uniform":
+            weight = Tensor(getdtype()(np.random.uniform(-1, 1, (self.input_dim, self.output_dim))))
+        # When sigmoid activation
+        elif self.weight_initialization_method == "normalized":
+            weight = Tensor(getdtype()(
+                np.random.randn(self.input_dim, self.output_dim)*np.sqrt(1/self.input_dim)))
+        # When tanh
+        elif self.weight_initialization_method == "xavier":
+            weight = Tensor(getdtype()(
+                np.random.randn(self.input_dim, self.output_dim)*np.sqrt(1/self.input_dim)))
+        elif self.weight_initialization_method == "he":
+            weight = Tensor(getdtype()(
+                np.random.randn(self.input_dim, self.output_dim) * np.sqrt(2 / (self.input_dim + self.output_dim))))
+        else:
+            raise Exception
+
         weight.type = "linear weight"
         self.weights = {"W": weight}
         if self.BN is True:

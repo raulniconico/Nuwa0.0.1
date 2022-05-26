@@ -2,8 +2,8 @@ import copy
 
 import numpy as np
 
-from Ottergrad.utils import getdtype
-from Ottergrad.autograd import Tensor, Func, checktensor
+from utils.utils import getdtype
+from Ottergrad.autograd import Tensor, Func, checkTensor
 from Ottergrad.utils import *
 
 
@@ -47,7 +47,7 @@ class _dot(Func):
         node.getright().setgrad(node.getright().getgrad() + ndot(node.getleft().getdata().T, node.getgrad()))
 
 
-@checktensor
+@checkTensor
 def dot(x, y):
     func = _dot()
     return func(x, y)
@@ -85,7 +85,7 @@ def nabs(x):
     return res
 
 
-@checktensor
+@checkTensor
 def abs(x):
     func = _abs()
     return func(x)
@@ -285,7 +285,7 @@ class _shape(Func):
         pass
 
 
-@checktensor
+@checkTensor
 def shape(x):
     func = _shape()
     return func(x)
@@ -469,7 +469,7 @@ def ntanh(x):
     return np.tanh(x)
 
 
-@checktensor
+@checkTensor
 def tanh(x):
     func = _tanh()
     return func(x)
@@ -505,7 +505,7 @@ def nsin(x):
     return np.sin(x)
 
 
-@checktensor
+@checkTensor
 def sin(x):
     func = _sin()
     return func(x)
@@ -542,7 +542,7 @@ def ncos(x):
     return np.cos(x)
 
 
-@checktensor
+@checkTensor
 def cos(x):
     func = _cos()
     return func(x)
@@ -580,7 +580,7 @@ def ntan(x):
     return np.tan(x)
 
 
-@checktensor
+@checkTensor
 def tan(x):
     func = _tan()
     return func(x)
@@ -630,7 +630,7 @@ def nwhere(contition, x, y):
     return np.where(contition, x, y)
 
 
-@checktensor
+@checkTensor
 def where(contition, x, y):
     func = _where()
     return func(contition, x, y)
@@ -678,7 +678,7 @@ class _var(Func):
         return tensor
 
 
-@checktensor
+@checkTensor
 def var(x, axis=0):
     func = _var()
     return func(x, axis)
@@ -707,7 +707,7 @@ class _sqrt(Func):
         node.getleft().setgrad(node.getleft().getgrad() + 1 / 2 * node.getleft().getdata() ** (-1 / 2))
 
 
-@checktensor
+@checkTensor
 def sqrt(x):
     func = _sqrt()
     return func(x)
